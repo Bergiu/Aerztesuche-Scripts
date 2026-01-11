@@ -16,7 +16,7 @@ Finding a doctor who is actually reachable is frustrating. This script solves th
 ### Installation Instructions
 
 1. Install a userscript manager like **Violentmonkey** (Firefox) or **Tampermonkey** (Chrome/Edge).
-2. **Easy Install**: Visit [GreasyFork](https://greasyfork.org/en/scripts/562363-116117-arztsuche-live-phone-availability) and click **"Install this script"**.
+2. **Easy Install**: Visit [GreasyFork](https://greasyfork.org/en/scripts/562296-116117-arztsuche-live-phone-availability-details) and click **"Install this script"**.
 3. **Manual Install**:
    - Create a new script.
    - Copy the contents of `live-phone-times.js` into the script editor.
