@@ -3,7 +3,7 @@
 // @name:en      116117 Arztsuche – Data Export (JSON)
 // @name:de      116117 Arztsuche – Data Export (JSON)
 // @namespace    https://github.com/Bergiu/Aerztesuche-Scripts
-// @version      1.2
+// @version      1.3
 // @description  Adds an export button to arztsuche.116117.de to export the response of the "api/data" call as JSON.
 // @description:en Adds an export button to arztsuche.116117.de to export the response of the "api/data" call as JSON.
 // @description:de Fügt einen Export-Button zur Arztsuche hinzu, um die Antwort des "api/data" Aufrufs als JSON zu exportieren.
@@ -123,22 +123,27 @@
       if (!printBtn || !printBtn.parentNode) return;
 
       const exportLink = document.getElementById("export-116117-link");
+      const csvLink = document.getElementById("export-116117-csv-link");
 
-      // Check if the export link is already in the correct position (immediately preceding printBtn)
-      if (exportLink && exportLink.nextSibling === printBtn) {
-        return; // Already in place
-      }
-
-      console.log("[EXPORT JSON] Re-inserting export link to correct position...");
       const link = exportLink || createLink();
 
-      // Remove from old position if it exists elsewhere
-      if (link.parentNode) {
-        link.parentNode.removeChild(link);
+      // Check position: Must be before printBtn
+      if (link.nextSibling !== printBtn || link.parentNode !== printBtn.parentNode) {
+        console.log("[EXPORT JSON] Re-inserting export link to correct position...");
+        if (link.parentNode) {
+          link.parentNode.removeChild(link);
+        }
+        printBtn.parentNode.insertBefore(link, printBtn);
       }
 
-      // Insert directly before the print button in the same container
-      printBtn.parentNode.insertBefore(link, printBtn);
+      // Check margins
+      if (csvLink && csvLink.parentNode === printBtn.parentNode) {
+        // [CSV] [JSON] [Print] -> JSON needs marginLeft 0
+        link.style.marginLeft = "0";
+      } else {
+        // [JSON] [Print] -> JSON needs marginLeft auto
+        link.style.marginLeft = "auto";
+      }
 
       // Update state
       updateLinkState(!!lastCapturedData);
