@@ -1,8 +1,12 @@
 // ==UserScript==
-// @name         116117 Arztsuche Data Export (CSV/Excel)
+// @name         116117 Arztsuche – Data Export (CSV/Excel)
+// @name:en      116117 Arztsuche – Data Export (CSV/Excel)
+// @name:de      116117 Arztsuche – Data Export (CSV/Excel)
 // @namespace    https://github.com/Bergiu/Aerztesuche-Scripts
 // @version      1.2
 // @description  Adds an export button to arztsuche.116117.de to export the list of doctors as CSV (Excel compatible).
+// @description:en Adds an export button to arztsuche.116117.de to export the list of doctors as CSV (Excel compatible).
+// @description:de Fügt einen Export-Button zur Arztsuche hinzu, um die Ärzteliste als CSV (Excel-kompatibel) zu exportieren.
 // @match        https://arztsuche.116117.de/*
 // @run-at       document-start
 // @grant        none

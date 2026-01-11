@@ -1,8 +1,12 @@
 // ==UserScript==
-// @name         116117 Arztsuche Data Export (JSON)
+// @name         116117 Arztsuche – Data Export (JSON)
+// @name:en      116117 Arztsuche – Data Export (JSON)
+// @name:de      116117 Arztsuche – Data Export (JSON)
 // @namespace    https://github.com/Bergiu/Aerztesuche-Scripts
 // @version      1.2
 // @description  Adds an export button to arztsuche.116117.de to export the response of the "api/data" call as JSON.
+// @description:en Adds an export button to arztsuche.116117.de to export the response of the "api/data" call as JSON.
+// @description:de Fügt einen Export-Button zur Arztsuche hinzu, um die Antwort des "api/data" Aufrufs als JSON zu exportieren.
 // @match        https://arztsuche.116117.de/*
 // @run-at       document-start
 // @grant        none
