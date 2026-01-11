@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         116117 Arztsuche Dev Cache (DO NOT INSTALL UNLESS DEV)
 // @namespace    https://github.com/Bergiu/Aerztesuche-Scripts
-// @version      1.2
+// @version      1.3
 // @description  !!!️ ONLY FOR DEVELOPERS !!!️ - Caches fetch + XHR calls for arztsuche.116117.de to prevent rate limits during development. DO NOT INSTALL this if you are looking for appointments.
 // @match        https://arztsuche.116117.de/*
 // @run-at       document-start
