@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         116117 Arztsuche Data Export (CSV/Excel)
 // @namespace    https://github.com/Bergiu/Aerztesuche-Scripts
-// @version      1.1
+// @version      1.2
 // @description  Adds an export button to arztsuche.116117.de to export the list of doctors as CSV (Excel compatible).
 // @match        https://arztsuche.116117.de/*
 // @run-at       document-start
@@ -238,10 +238,10 @@
         if (url && url.includes("api/data")) {
           try {
             lastCapturedData = xhr.responseText;
-            console.log("[EXPORT] Captured data from XHR:", url);
+            console.log("[EXPORT CSV] Captured data from XHR:", url);
             updateLinkState(true);
           } catch(e) {
-            console.warn("[EXPORT] Failed to capture XHR data", e);
+            console.warn("[EXPORT CSV] Failed to capture XHR data", e);
           }
         }
       });
@@ -249,7 +249,7 @@
       return xhr;
     };
 
-    console.log("[EXPORT] Hooks installed. Waiting for 'api/data'...");
+    console.log("[EXPORT CSV] Hooks installed. Waiting for 'api/data'...");
 
     // --- Export Link Integration ---
     function createLink() {
@@ -292,7 +292,7 @@
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          console.log("[EXPORT] Download triggered");
+          console.log("[EXPORT CSV] Download triggered");
         } catch(e) {
           alert("Error exporting data: " + e.message);
         }
@@ -322,7 +322,7 @@
         return; // Already in place
       }
 
-      console.log("[EXPORT] Re-inserting export link to correct position...");
+      console.log("[EXPORT CSV] Re-inserting export link to correct position...");
       const link = exportLink || createLink();
 
       // Remove from old position if it exists elsewhere
