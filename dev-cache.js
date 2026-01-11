@@ -1,14 +1,15 @@
 // ==UserScript==
 // @name         116117 Arztsuche Dev Cache
-// @namespace    dev-cache-116117
-// @version      1.1
+// @namespace    https://github.com/Bergiu/Aerztesuche-Scripts
+// @version      1.2
 // @description  Caches fetch + XHR calls for arztsuche.116117.de. This can be used to not run into rate limits when using the site repeatedly. It's purpose is to ease development and not to be used in production. It will not clean up old cache entries, so you might want to clear it manually from time to time with the "Clear Dev Cache" button.
 // @match        https://arztsuche.116117.de/*
 // @run-at       document-start
 // @grant        none
 // @license      MIT
 // @author       Bergiu
-// @homepage     https://github.com/Bergiu/Aerztesuche-Scripts
+// @homepageURL  https://github.com/Bergiu/Aerztesuche-Scripts
+// @supportURL   https://github.com/Bergiu/Aerztesuche-Scripts/issues
 // ==/UserScript==
 
 (function inject() {
