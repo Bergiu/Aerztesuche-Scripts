@@ -1,8 +1,8 @@
 ## `live-phone-times.js`
 
-This userscript enhances the 116117 search results by visualizing live telephone availability and improving the overall user experience.
+### Purpose
 
-![Live Phone Times Preview](img/live-phone-times.png)
+Finding a doctor who is actually reachable is frustrating. This script solves that by visualizing the live telephone availability directly in the search results. Instead of guessing or clicking through details, you get an instant green indicator for doctors who are currently picking up the phone, and a countdown for those who will be available soon.
 
 ### Key Features
 
@@ -12,6 +12,18 @@ This userscript enhances the 116117 search results by visualizing live telephone
   - **Quick Actions**: Call, Email (with templates), and Open in Maps buttons.
   - **Smart Details**: Collapsible view with today's opening hours and additional contact info.
 - **Test Mode**: Simulate different dates and times to verify availability logic (only available when `dev-cache.js` is active).
+
+### Installation Instructions
+
+1. Install a userscript manager like **Violentmonkey** (Firefox) or **Tampermonkey** (Chrome/Edge).
+2. **Easy Install**: Visit [GreasyFork](https://greasyfork.org/en/scripts/562363-116117-arztsuche-live-phone-availability) and click **"Install this script"**.
+3. **Manual Install**:
+   - Create a new script.
+   - Copy the contents of `live-phone-times.js` into the script editor.
+   - Save the script.
+4. Navigate to `https://arztsuche.116117.de/` and search for doctors (e.g., "Allgemeinmedizin").
+
+![Live Phone Times Preview](img/live-phone-times.png)
 
 ## `dev-cache.js`
 
@@ -45,8 +57,6 @@ The primary goal is to **prevent hitting rate limits** while developing or testi
 
 This is a userscript designed to **export search results** from `arztsuche.116117.de` as a JSON file.
 
-![JSON Export Preview](img/export-json.png)
-
 ### Purpose
 
 This tool allows users to capture the raw data returned by the API during a search (the doctor application) and save it locally for analysis or processing.
@@ -68,11 +78,11 @@ This tool allows users to capture the raw data returned by the API during a sear
    - Copy the contents of `export-json.js` into the script editor.
    - Save the script.
 
+![JSON Export Preview](img/export-json.png)
+
 ## `export-csv.js`
 
 This is a userscript designed to **export search results** as a **CSV file** (compatible with Excel).
-
-![CSV Export Preview](img/export-csv.png)
 
 ### Purpose
 
@@ -85,6 +95,8 @@ This tool captures the raw data from the doctor search and processes it into a *
 - **Integrated UI**: Adds an **"Exportieren (CSV)"** button next to the existing **"PDF ausdrucken"** button.
 - **One-Click Download**: Clicking the link instantly downloads the captured data as `116117-api-data.csv`.
 - **Works with Cache**: Fully compatible with `dev-cache.js`, allowing you to export data even if it was served from the local developer cache.
+
+![CSV Export Preview](img/export-csv.png)
 
 ### Installation Instructions
 
