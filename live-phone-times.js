@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         116117 – Ärzte Live Erreichbarkeit & Details
 // @namespace    https://github.com/Bergiu/Aerztesuche-Scripts
-// @version      0.5.2
+// @version      0.5.3
 // @description  Visualizes live telephone availability, offers expanded doctor details, and allows testing with fake times.
 // @match        https://arztsuche.116117.de/*
 // @grant        unsafeWindow
