@@ -26,18 +26,18 @@ The primary goal is to **prevent hitting rate limits** while developing or testi
 
 > **Warning**: This script is for **development purposes only**. Do not use it when you need live, up-to-date availability data for real appointments.
 
-## `dev-export-json.js`
+## `export-json.js`
 
 This is a userscript designed to **export search results** from `arztsuche.116117.de` as a JSON file.
 
 ### Purpose
 
-This tool allows developers or power users to capture the raw data returned by the API during a search (the doctor application) and save it locally for analysis or processing.
+This tool allows users to capture the raw data returned by the API during a search (the doctor application) and save it locally for analysis or processing.
 
 ### Key Features
 
 - **Silent Capture**: Passively listens to the background "api/data" network request used by the search.
-- **Integrated UI**: Seamlessly inserts an **"Arztliste exportieren (JSON)"** link right next to the existing **"PDF ausdrucken"** button.
+- **Integrated UI**: Seamlessly inserts an **"Exportieren (JSON)"** link right next to the existing **"PDF ausdrucken"** button.
 - **Native Look & Feel**: The link automatically adapts to the site's layout changes (e.g., resizing the window) and matches the existing style.
 - **One-Click Download**: Clicking the link instantly downloads the captured data as `116117-api-data.json`.
 - **Works with Cache**: Fully compatible with `dev-cache.js`, allowing you to export data even if it was served from the local developer cache.
@@ -48,5 +48,30 @@ This tool allows developers or power users to capture the raw data returned by t
 2. **Easy Install**: Visit [GreasyFork](https://greasyfork.org/en/scripts/562284-116117-arztsuche-data-export-json) and click **"Install this script"**.
 3. **Manual Install**:
    - Create a new script.
-   - Copy the contents of `dev-export-json.js` into the script editor.
+   - Copy the contents of `export-json.js` into the script editor.
    - Save the script.
+
+## `export-csv.js`
+
+This is a userscript designed to **export search results** as a **CSV file** (compatible with Excel).
+
+### Purpose
+
+This tool captures the raw data from the doctor search and processes it into a **human-readable table format** suitable for Excel. It flattens the complex data structure into clear columns like Name, Address, Contact Info, and Therapy Types, with separate columns for availability on specific dates.
+
+### Key Features
+
+- **CSV Conversion**: Automatically converts the complex JSON response into a flat CSV format.
+- **Excel Friendly**: Handles special characters and formatting so it opens correctly in Excel.
+- **Integrated UI**: Adds an **"Exportieren (CSV)"** button next to the existing **"PDF ausdrucken"** button.
+- **One-Click Download**: Clicking the link instantly downloads the captured data as `116117-api-data.csv`.
+- **Works with Cache**: Fully compatible with `dev-cache.js`, allowing you to export data even if it was served from the local developer cache.
+
+### Installation Instructions
+
+1. Install a userscript manager like **Violentmonkey** (Firefox) or **Tampermonkey** (Chrome/Edge).
+2. **Manual Install**:
+   - Create a new script.
+   - Copy the contents of `export-csv.js` into the script editor.
+   - Save the script.
+3. Reload the arztsuche page to see the new button.

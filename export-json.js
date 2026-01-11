@@ -25,7 +25,7 @@
       if (hasData) {
         link.style.cursor = "pointer";
         link.style.opacity = "1";
-        link.title = "Klicken zum Herunterladen";
+        link.title = "Klicken zum Herunterladen (JSON)";
       } else {
         link.style.cursor = "not-allowed";
         link.style.opacity = "0.5";
