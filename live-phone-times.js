@@ -10,9 +10,128 @@
 (function() {
     'use strict';
 
-    const USE_TEST_DATA = true;
-
     console.log('[GM] Ärzte Live Erreichbarkeit loaded');
+
+    // --- 0. TEST MODE HELPER ---
+    const FakeTime = {
+        active: false,
+        offset: 0, // Difference between target time and real time
+
+        now() {
+            if (this.active) {
+                return new Date(Date.now() + this.offset);
+            }
+            return new Date();
+        },
+
+        set(inputStr) {
+            if (!inputStr || !inputStr.trim()) {
+                this.active = false;
+                this.offset = 0;
+                return;
+            }
+
+            // Try parsing "YYYY-MM-DD HH:MM"
+            let d = new Date(inputStr);
+
+            // If invalid, try parsing "HH:MM" for today
+            if (isNaN(d.getTime())) {
+                const parts = inputStr.split(':');
+                if (parts.length === 2) {
+                    const h = parseInt(parts[0]);
+                    const m = parseInt(parts[1]);
+                    if (!isNaN(h) && !isNaN(m)) {
+                        d = new Date();
+                        d.setHours(h);
+                        d.setMinutes(m);
+                        d.setSeconds(0);
+                        d.setMilliseconds(0);
+                    }
+                }
+            }
+
+            if (!isNaN(d.getTime())) {
+                this.offset = d.getTime() - Date.now();
+                this.active = true;
+            } else {
+                alert("Ungültiges Format. Bitte 'YYYY-MM-DD HH:MM' oder 'HH:MM' nutzen.");
+            }
+        },
+
+        toggleUI() {
+            const current = this.now();
+            // Default value format: YYYY-MM-DD HH:MM
+            const defVal = [
+                current.getFullYear(),
+                String(current.getMonth()+1).padStart(2,'0'),
+                String(current.getDate()).padStart(2,'0')
+            ].join('-') + ' ' + [
+                String(current.getHours()).padStart(2,'0'),
+                String(current.getMinutes()).padStart(2,'0')
+            ].join(':');
+
+            let input = prompt("Datum & Zeit setzen (YYYY-MM-DD HH:MM) oder nur Zeit (HH:MM):\nLeer lassen zum Deaktivieren.", defVal);
+            if(input !== null) {
+                this.set(input);
+                updateTestButton();
+            }
+        }
+    };
+
+    function updateTestButton() {
+        // Only show if Dev Cache button exists
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const cacheBtn = buttons.find(b => b.textContent && b.textContent.includes("Clear Dev Cache"));
+
+        if (!cacheBtn) {
+            // Remove if exists and cache button is gone
+            const existing = document.getElementById('gm-test-time-btn');
+            if(existing) existing.remove();
+            return;
+        }
+
+        let btn = document.getElementById('gm-test-time-btn');
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'gm-test-time-btn';
+            Object.assign(btn.style, {
+                position: 'fixed',
+                bottom: '10px',
+                right: '120px',
+                zIndex: 9999,
+                padding: '5px 10px',
+                background: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+            });
+            btn.onclick = () => FakeTime.toggleUI();
+            document.body.appendChild(btn);
+        }
+
+        if (FakeTime.active) {
+            const d = FakeTime.now();
+            // Show Day + Time if not today, otherwise just time
+            const now = new Date();
+            let label = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+            if (d.getDate() !== now.getDate() || d.getMonth() !== now.getMonth()) {
+               label = `${d.getDate()}.${d.getMonth()+1}. ${label}`;
+            }
+
+            btn.textContent = `Test: ${label}`;
+            btn.style.background = '#f59e0b'; // Orange when active
+        } else {
+            btn.textContent = "Set Test Time";
+            btn.style.background = '#3b82f6';
+        }
+    }
+
+    // Init UI
+    setTimeout(updateTestButton, 2000);
+
 
     // --- 1. DATA HELPERS ---
 
@@ -35,11 +154,29 @@
 
     function checkIsPhoneOpenNow(tszArray) {
         if (!tszArray || !Array.isArray(tszArray)) return { isOpen: false, remaining: 0 };
-        const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
+        const now = FakeTime.now();
+        // Use local YYYY-MM-DD
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d_day = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d_day}`;
+
         const currentTimeVal = now.getHours() * 60 + now.getMinutes();
 
-        const todayEntry = tszArray.find(d => d.d === todayStr);
+        const todayEntry = tszArray.find(d => d.d.startsWith(todayStr)); // startswith safe for iso
+        // Note: The original code used d.d === todayStr. d.d from API is usually YYYY-MM-DD.
+        // ISOString returns YYYY-MM-DDTHH:mm:ss.sssZ. split('T')[0] gives YYYY-MM-DD.
+        // However, if FakeTime is shifted significantly, "today" might be different.
+        // We rely on FakeTime.now() returning a Date object that behaves correctly.
+
+        /*
+           CAUTION: The original code compared `d.d` (string) with `now.toISOString().split('T')[0]`.
+           The API `d.d` is YYYY-MM-DD.
+           If we fake the time, `FakeTime.now()` returns a Date object with the fake time.
+           If the fake time is today, it works. If we wanted to fake "tomorrow", we'd need to set the date accordingly.
+           Currently `FakeTime.set` only changes hours/minutes of *today*. So this is fine.
+        */
+
         if (!todayEntry || !todayEntry.typTsz) return { isOpen: false, remaining: 0 };
 
         for (const typObj of todayEntry.typTsz) {
@@ -62,7 +199,8 @@
     }
 
     function mapRealDoctor(doc) {
-        const now = Date.now();
+        const now = FakeTime.now();
+        const nowMs = now.getTime();
         const fullName = [doc.titel, doc.vorname, doc.name].filter(Boolean).join(' ');
 
         let category = 'Arzt';
@@ -80,12 +218,12 @@
         if (statusNow.isOpen) {
             _isNow = true;
             _remaining = statusNow.remaining;
-            _nextStart = now;
+            _nextStart = nowMs;
         } else {
             const nteDate = parseNteDate(doc.nteStart);
-            if (nteDate && nteDate > now) {
+            if (nteDate && nteDate.getTime() > nowMs) {
                 _nextStart = nteDate.getTime();
-                _remaining = Math.round((_nextStart - now) / 60000);
+                _remaining = Math.round((_nextStart - nowMs) / 60000);
             }
         }
 
@@ -110,7 +248,7 @@
         return `in ${remainingMin} min`;
     }
 
-    // Globaler State für aufgeklappte Karten (außerhalb der Funktionen definieren, z.B. ganz oben im Script oder vor createDoctorCard)
+    // Globaler State für aufgeklappte Karten
     const expandedDoctors = new Set();
 
     function createDoctorCard(d, type) {
@@ -120,7 +258,6 @@
         const isNow = type === 'now';
         const timeLeftStr = formatTimeLabel(d._remaining, isNow);
 
-        // Eindeutige ID für den State (Fallback auf Name, falls ID fehlt)
         const docId = d.raw && d.raw.id ? d.raw.id : d.name;
         const isExpanded = expandedDoctors.has(docId);
 
@@ -167,11 +304,9 @@
             </div>
         `;
 
-        // Event Listeners mit State Persistence
         wrapper.querySelector('.expander-bar').onclick = () => {
             const logsDiv = wrapper.querySelector('.doctor-logs');
             const nowOpen = logsDiv.classList.toggle('open');
-
             if (nowOpen) expandedDoctors.add(docId);
             else expandedDoctors.delete(docId);
         };
@@ -199,6 +334,9 @@
         const title = document.createElement('h2');
         title.className = 'section-title';
         title.textContent = 'Jetzt erreichbar';
+        if (FakeTime.active) {
+            title.textContent += ` (TEST: ${FakeTime.now().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})`;
+        }
         section.appendChild(title);
 
         const listDiv = document.createElement('div');
@@ -209,7 +347,6 @@
         });
         section.appendChild(listDiv);
 
-        // Called Toggle Placeholder
         const calledDoctors = [];
         if (calledDoctors.length > 0) {
             const toggleContainer = document.createElement('div');
@@ -275,76 +412,61 @@
     // --- 3. MAIN RENDER CONTROLLER ---
 
     function renderLists(openNow, openSoon) {
-        const anchor = document.querySelector('#searchResultList');
-        if (!anchor) return;
+        // New Parent: .search-results-container
+        const parent = document.querySelector('.search-results-container');
 
-        const old = document.getElementById('gm-doctor-lists');
-        if (old) old.remove();
+        // If parent missing, remove our list (if exists) and return
+        if (!parent) {
+             const old = document.getElementById('gm-doctor-lists');
+             if (old) old.remove();
+             return;
+        }
 
-        const container = document.createElement('div');
-        container.id = 'gm-doctor-lists';
+        let container = document.getElementById('gm-doctor-lists');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'gm-doctor-lists';
+            // Insert at the top of the search results
+            parent.insertBefore(container, parent.firstChild);
+        }
 
+        // Clear content instead of removing node to prevent thrashing
+        container.innerHTML = '';
+
+        if (openNow.length === 0 && openSoon.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.style.textAlign = 'center';
+            emptyMsg.style.padding = '20px';
+            emptyMsg.style.color = '#6b7280';
+            emptyMsg.innerHTML = '<div style="font-size: 2rem;">😴</div><br>Keine Ärzte zu dieser Zeit erreichbar.';
+            if (FakeTime.active) {
+                const d = FakeTime.now();
+                const now = new Date();
+                let label = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                if (d.getDate() !== now.getDate() || d.getMonth() !== now.getMonth()) {
+                     label = `${d.getDate()}.${d.getMonth()+1}. ${label}`;
+                }
+                emptyMsg.innerHTML += `<br><small style="color: #f59e0b">Test-Zeit: ${label}</small>`;
+            }
+            container.appendChild(emptyMsg);
+            return;
+        }
+
+        console.log("Render lists")
         renderNowSection(container, openNow);
         renderSoonSection(container, openSoon);
-
-        anchor.parentNode.insertBefore(container, anchor);
     }
 
 
-    // --- 4. TEST DATA & INIT ---
 
-    function getTestDoctors() {
-        const now = Date.now();
-        return [
-            { name: 'Dr. Anna Müller', phone: '0301234567', category: 'Hausärztin', distance: 1.2, _remaining: 35, _nextStart: now, _isNow: true },
-            { name: 'Dr. Eva Schneider', phone: '0305551122', category: 'Psychotherapie', distance: 4.1, _remaining: 25, _nextStart: now + 25 * 60000, _isNow: false },
-            { name: 'Dr. Thomas Krüger', phone: '0304447788', category: 'Hausarzt', distance: 3.6, _remaining: 17 * 60, _nextStart: now + 17 * 60 * 60000, _isNow: false },
-            { name: 'Dipl.-Psych. Markus Weber', phone: '0309876543', category: 'Psychotherapie', distance: 2.8, _remaining: 90, _nextStart: now, _isNow: true }
-        ];
-    }
-
-    function buildListsFromTestData() {
-        const all = getTestDoctors();
-        const now = Date.now();
-        return {
-            openNow: all.filter(d => d._isNow).sort((a,b) => a.distance - b.distance),
-            // FIX: Nur anzeigen, wenn _nextStart noch HEUTE ist
-            openSoon: all.filter(d => !d._isNow && isSameDay(d._nextStart, now)).sort((a,b) => a._remaining - b._remaining)
-        };
-    }
 
     // --- 5. MAIN LOOP ---
 
     let lastListRef = null;
+    let lastRenderMinute = -1;
 
     setInterval(() => {
-        // --- TEST MODE LOGIK ---
-        if (USE_TEST_DATA) {
-            let anchor = document.querySelector('#searchResultList');
 
-            // 1. Container erstellen falls nicht da
-            if (!anchor) {
-                const mainContent = document.querySelector('#app > div > .main-content');
-                if (mainContent) {
-                    const container = document.createElement('div');
-                    container.id = 'searchResultList';
-                    container.style.marginTop = '20px';
-                    mainContent.appendChild(container);
-                    anchor = container;
-                }
-            }
-
-            // 2. BREMSE: Nur rendern, wenn der Container leer ist.
-            // Behebt das Problem mit zuckenden Details/DevTools im Testmodus.
-            if (anchor && !document.getElementById('gm-doctor-lists')) {
-                const { openNow, openSoon } = buildListsFromTestData();
-                renderLists(openNow, openSoon);
-                console.log('[GM] Testdaten gerendert (Filter: Nur Heute).');
-            }
-            return;
-        }
-
-        // --- LIVE MODE LOGIK ---
         const rootEl = unsafeWindow.document.querySelector('#app > div');
         if (!rootEl || !rootEl.__vue__) return;
 
@@ -354,20 +476,38 @@
         if (!rawList && comp.$data && comp.$data.arztPraxisDatas) rawList = comp.$data.arztPraxisDatas;
         if (!rawList || !Array.isArray(rawList)) return;
 
-        // Change Detection
-        if (rawList === lastListRef) {
-             // Optional: Prüfen ob unser Container durch Navigation gelöscht wurde
-             if (document.querySelector('#searchResultList') && !document.getElementById('gm-doctor-lists')) {
-                 // Force Re-Render
+        // Change Detection:
+        // User requested to assume list reference doesn't change often to save perfs.
+        // We will re-render if:
+        // 1. FakeTime is active (dynamic)
+        // 2. The rawList reference changes
+        // 3. The current minute changes (to update countdowns "in X min")
+
+        const now = FakeTime.now();
+        const currentMinute = Math.floor(now.getTime() / 60000);
+
+        if (FakeTime.active) updateTestButton();
+
+        const isListChanged = rawList !== lastListRef;
+        const isMinuteChanged = currentMinute !== lastRenderMinute;
+        const isFakeTime = FakeTime.active;
+
+        if (!isListChanged && !isMinuteChanged) {
+             // Check if container was removed by Vue navigation
+             if (document.querySelector('.search-results-container') && !document.getElementById('gm-doctor-lists')) {
+                 console.log("[GM] Force Render: UI missing");
              } else {
                  return;
              }
+        } else {
+             console.log("[GM] Rerender:", { isListChanged, isMinuteChanged, isFakeTime });
         }
+
         lastListRef = rawList;
+        lastRenderMinute = currentMinute;
 
         const openNow = [];
         const openSoon = [];
-        const now = new Date();
 
         for (const doc of rawList) {
             const mapped = mapRealDoctor(doc);
@@ -375,7 +515,6 @@
             if (mapped._isNow) {
                 openNow.push(mapped);
             }
-            // FIX: Nur zur Liste hinzufügen, wenn der nächste Termin noch HEUTE ist
             else if (mapped._nextStart && isSameDay(mapped._nextStart, now)) {
                 openSoon.push(mapped);
             }
