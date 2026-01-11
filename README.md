@@ -17,7 +17,7 @@ The primary goal is to **prevent hitting rate limits** while developing or testi
 ### Installation Instructions
 
 1. Install a userscript manager like **Violentmonkey** (Firefox) or **Tampermonkey** (Chrome/Edge).
-2. **Easy Install**: Visit [GreasyFork](https://greasyfork.org/en/scripts/562278-116117-arztsuche-dev-cache) and click **"Install this script"**.
+2. **Easy Install**: Visit [GreasyFork](https://greasyfork.org/en/scripts/562278-116117-arztsuche-dev-cache-do-not-install-unless-dev) and click **"Install this script"**.
 3. **Manual Install**:
    - Create a new script.
    - Copy the contents of `dev-cache.js` into the script editor.
@@ -25,3 +25,28 @@ The primary goal is to **prevent hitting rate limits** while developing or testi
 4. Navigate to `https://arztsuche.116117.de/` and open the developer console to see it in action.
 
 > **Warning**: This script is for **development purposes only**. Do not use it when you need live, up-to-date availability data for real appointments.
+
+## `dev-export-json.js`
+
+This is a userscript designed to **export search results** from `arztsuche.116117.de` as a JSON file.
+
+### Purpose
+
+This tool allows developers or power users to capture the raw data returned by the API during a search (the doctor application) and save it locally for analysis or processing.
+
+### Key Features
+
+- **Silent Capture**: Passively listens to the background "api/data" network request used by the search.
+- **Integrated UI**: Seamlessly inserts an **"Arztliste exportieren (JSON)"** link right next to the existing **"PDF ausdrucken"** button.
+- **Native Look & Feel**: The link automatically adapts to the site's layout changes (e.g., resizing the window) and matches the existing style.
+- **One-Click Download**: Clicking the link instantly downloads the captured data as `116117-api-data.json`.
+- **Works with Cache**: Fully compatible with `dev-cache.js`, allowing you to export data even if it was served from the local developer cache.
+
+### Installation Instructions
+
+1. Install a userscript manager like **Violentmonkey** (Firefox) or **Tampermonkey** (Chrome/Edge).
+2. **Easy Install**: Visit [GreasyFork](https://greasyfork.org/de/scripts/523458-116117-arztsuche-data-export-json) and click **"Install this script"**.
+3. **Manual Install**:
+   - Create a new script.
+   - Copy the contents of `dev-export-json.js` into the script editor.
+   - Save the script.
