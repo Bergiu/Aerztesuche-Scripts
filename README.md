@@ -70,8 +70,9 @@ This tool captures the raw data from the doctor search and processes it into a *
 ### Installation Instructions
 
 1. Install a userscript manager like **Violentmonkey** (Firefox) or **Tampermonkey** (Chrome/Edge).
-2. **Manual Install**:
+2. **Easy Install**: Visit [GreasyFork](https://greasyfork.org/en/scripts/562293-116117-arztsuche-data-export-csv-excel) and click **"Install this script"**.
+3. **Manual Install**:
    - Create a new script.
    - Copy the contents of `export-csv.js` into the script editor.
    - Save the script.
-3. Reload the arztsuche page to see the new button.
+4. Reload the arztsuche page to see the new button.
