@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         116117 Arztsuche Dev Cache
+// @name         116117 Arztsuche Dev Cache (DO NOT INSTALL UNLESS DEV)
 // @namespace    https://github.com/Bergiu/Aerztesuche-Scripts
 // @version      1.2
-// @description  Caches fetch + XHR calls for arztsuche.116117.de. This can be used to not run into rate limits when using the site repeatedly. It's purpose is to ease development and not to be used in production. It will not clean up old cache entries, so you might want to clear it manually from time to time with the "Clear Dev Cache" button.
+// @description  !!!️ ONLY FOR DEVELOPERS !!!️ - Caches fetch + XHR calls for arztsuche.116117.de to prevent rate limits during development. DO NOT INSTALL this if you are looking for appointments.
 // @match        https://arztsuche.116117.de/*
 // @run-at       document-start
 // @grant        none
@@ -56,7 +56,7 @@
       const url = typeof input === "string" ? input : input.url;
 
       const key = makeKey({ method, url, body: init.body, config: init });
-      const hit = DEV_MODE && localStorage.getItem(key);
+      const hit = DEV_MODE && sessionStorage.getItem(key);
 
       if (hit) {
         console.log("[CACHE HIT][fetch]", method, url);
@@ -70,7 +70,7 @@
       const text = await clone.text();
 
       try {
-        localStorage.setItem(key, JSON.stringify({
+        sessionStorage.setItem(key, JSON.stringify({
           body: text,
           init: {
             status: res.status,
@@ -105,7 +105,7 @@
         config = {}; // placeholder falls nötig
 
         const key = makeKey({ method, url, body, config });
-        const hit = DEV_MODE && localStorage.getItem(key);
+        const hit = DEV_MODE && sessionStorage.getItem(key);
 
         if (hit) {
           console.log("[CACHE HIT][xhr]", method, url);
@@ -138,7 +138,7 @@
         console.log("[CACHE MISS][xhr]", method, url);
         xhr.addEventListener("load", () => {
           try {
-            localStorage.setItem(key, JSON.stringify({
+            sessionStorage.setItem(key, JSON.stringify({
               status: xhr.status,
               body: xhr.responseText
             }));
@@ -179,7 +179,7 @@
       btn.title = "Click to clear all cached data";
 
       btn.addEventListener("click", () => {
-        localStorage.clear();
+        sessionStorage.clear();
         console.log("[DEV CACHE] Cleared all cached data");
         alert("All Dev Cache cleared!");
       });
