@@ -1,0 +1,530 @@
+// ==UserScript==
+// @name         116117 – Ärzte Live Erreichbarkeit (Color Fix)
+// @namespace    https://example.local/116117-vue-live
+// @version      0.5.2
+// @match        https://arztsuche.116117.de/*
+// @grant        unsafeWindow
+// @grant        GM_addStyle
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    const USE_TEST_DATA = true;
+
+    console.log('[GM] Ärzte Live Erreichbarkeit loaded');
+
+    // --- 1. DATA HELPERS ---
+
+    function isSameDay(date1, date2) {
+        if (!date1 || !date2) return false;
+        const d1 = new Date(date1);
+        const d2 = new Date(date2);
+        return d1.getDate() === d2.getDate() &&
+               d1.getMonth() === d2.getMonth() &&
+               d1.getFullYear() === d2.getFullYear();
+    }
+
+    function parseNteDate(nteString) {
+        if (!nteString) return null;
+        try {
+            const [datePart, timePart] = nteString.split('@');
+            return new Date(`${datePart}T${timePart}:00`);
+        } catch (e) { return null; }
+    }
+
+    function checkIsPhoneOpenNow(tszArray) {
+        if (!tszArray || !Array.isArray(tszArray)) return { isOpen: false, remaining: 0 };
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const currentTimeVal = now.getHours() * 60 + now.getMinutes();
+
+        const todayEntry = tszArray.find(d => d.d === todayStr);
+        if (!todayEntry || !todayEntry.typTsz) return { isOpen: false, remaining: 0 };
+
+        for (const typObj of todayEntry.typTsz) {
+            if (typObj.typ === '07' && typObj.sprechzeiten) {
+                for (const zeit of typObj.sprechzeiten) {
+                    const parts = zeit.z.split(' - ');
+                    if (parts.length === 2) {
+                        const [start, end] = parts;
+                        const startVal = parseInt(start.split(':')[0]) * 60 + parseInt(start.split(':')[1]);
+                        const endVal = parseInt(end.split(':')[0]) * 60 + parseInt(end.split(':')[1]);
+
+                        if (currentTimeVal >= startVal && currentTimeVal < endVal) {
+                            return { isOpen: true, remaining: endVal - currentTimeVal };
+                        }
+                    }
+                }
+            }
+        }
+        return { isOpen: false, remaining: 0 };
+    }
+
+    function mapRealDoctor(doc) {
+        const now = Date.now();
+        const fullName = [doc.titel, doc.vorname, doc.name].filter(Boolean).join(' ');
+
+        let category = 'Arzt';
+        if (doc.ag && doc.ag.length > 0) category = doc.ag[0].value;
+        else if (doc.fg && doc.fg.length > 0) category = doc.fg[0];
+
+        const distKm = doc.distance ? (doc.distance / 1000).toFixed(1) : 0;
+
+        let _remaining = 0;
+        let _nextStart = null;
+        let _isNow = false;
+
+        const statusNow = checkIsPhoneOpenNow(doc.tsz);
+
+        if (statusNow.isOpen) {
+            _isNow = true;
+            _remaining = statusNow.remaining;
+            _nextStart = now;
+        } else {
+            const nteDate = parseNteDate(doc.nteStart);
+            if (nteDate && nteDate > now) {
+                _nextStart = nteDate.getTime();
+                _remaining = Math.round((_nextStart - now) / 60000);
+            }
+        }
+
+        return {
+            name: fullName,
+            phone: doc.tel || 'Keine Nummer',
+            category: category,
+            distance: distKm,
+            address: `${doc.strasse || ''} ${doc.hausnummer || ''}, ${doc.plz || ''} ${doc.ort || ''}`,
+            _remaining: _remaining,
+            _nextStart: _nextStart,
+            _isNow: _isNow,
+            raw: doc
+        };
+    }
+
+    // --- 2. UI COMPONENTS ---
+
+    function formatTimeLabel(remainingMin, isNow) {
+        if (isNow) return `noch ${remainingMin} min`;
+        if (remainingMin > 60) return `in ${(remainingMin/60).toFixed(1)}h`;
+        return `in ${remainingMin} min`;
+    }
+
+    // Globaler State für aufgeklappte Karten (außerhalb der Funktionen definieren, z.B. ganz oben im Script oder vor createDoctorCard)
+    const expandedDoctors = new Set();
+
+    function createDoctorCard(d, type) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'doctor-card-wrapper';
+
+        const isNow = type === 'now';
+        const timeLeftStr = formatTimeLabel(d._remaining, isNow);
+
+        // Eindeutige ID für den State (Fallback auf Name, falls ID fehlt)
+        const docId = d.raw && d.raw.id ? d.raw.id : d.name;
+        const isExpanded = expandedDoctors.has(docId);
+
+        wrapper.innerHTML = `
+            <div class="doctor-card">
+                <div class="card-header-row">
+                    <div class="time-slot ${isNow ? 'active' : 'pending'}">
+                        ${timeLeftStr}
+                    </div>
+                    <div class="header-actions">
+                        ${isNow ? `
+                        <a href="tel:${d.phone.replace(/\s/g,'')}" class="btn-icon call primary-pulse" title="Anrufen">📞</a>
+                        <button class="btn-icon history" title="Notiz">📝</button>
+                        ` : `
+                        <button class="btn-icon reminder" title="Erinnerung erstellen">📅</button>
+                        `}
+                    </div>
+                </div>
+
+                <div class="doctor-main-info">
+                    <div class="name-row">
+                        <h3 class="doctor-name">${d.name}</h3>
+                        <span class="doctor-dist">${d.distance} km</span>
+                    </div>
+                    <div class="doctor-meta">
+                        <span class="doctor-phone">📞 ${d.phone}</span>
+                        <span class="doctor-spec">${d.category}</span>
+                    </div>
+                </div>
+
+                <div class="expander-bar" title="Details aufklappen">
+                    <span class="expander-handle"></span>
+                </div>
+            </div>
+
+            <div class="doctor-logs ${isExpanded ? 'open' : ''}">
+                <div class="expanded-actions">
+                     <div class="opening-hours-row">
+                        <span class="oh-label">Status:</span>
+                        <span class="oh-value">${d.raw && d.raw.tsz ? 'Daten vorhanden' : 'Keine Daten'}</span>
+                     </div>
+                     <button class="btn-manual-log">+ Manuell erfassen</button>
+                </div>
+            </div>
+        `;
+
+        // Event Listeners mit State Persistence
+        wrapper.querySelector('.expander-bar').onclick = () => {
+            const logsDiv = wrapper.querySelector('.doctor-logs');
+            const nowOpen = logsDiv.classList.toggle('open');
+
+            if (nowOpen) expandedDoctors.add(docId);
+            else expandedDoctors.delete(docId);
+        };
+
+        if(!isNow) {
+             const reminderBtn = wrapper.querySelector('.btn-icon.reminder');
+             if(reminderBtn) {
+                 reminderBtn.onclick = () => {
+                     const start = new Date(d._nextStart).toISOString().replace(/[-:]|\.000/g,'');
+                     const end = new Date(d._nextStart + 30*60000).toISOString().replace(/[-:]|\.000/g,'');
+                     window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(d.name)}&dates=${start}/${end}&details=${encodeURIComponent(d.phone)}`);
+                 };
+             }
+        }
+
+        return wrapper;
+    }
+
+    function renderNowSection(container, doctors) {
+        if (doctors.length === 0) return;
+
+        const section = document.createElement('div');
+        section.className = 'now-section';
+
+        const title = document.createElement('h2');
+        title.className = 'section-title';
+        title.textContent = 'Jetzt erreichbar';
+        section.appendChild(title);
+
+        const listDiv = document.createElement('div');
+        listDiv.className = 'doctors-list now-list';
+
+        doctors.forEach(d => {
+            listDiv.appendChild(createDoctorCard(d, 'now'));
+        });
+        section.appendChild(listDiv);
+
+        // Called Toggle Placeholder
+        const calledDoctors = [];
+        if (calledDoctors.length > 0) {
+            const toggleContainer = document.createElement('div');
+            toggleContainer.className = 'called-toggle-container';
+            toggleContainer.innerHTML = `<button class="btn-show-called">Zeige bereits angerufene (${calledDoctors.length})</button>`;
+            section.appendChild(toggleContainer);
+        }
+
+        container.appendChild(section);
+    }
+
+    function renderSoonSection(container, doctors) {
+        if (doctors.length === 0) return;
+
+        const section = document.createElement('div');
+        section.className = 'soon-section';
+
+        const title = document.createElement('div');
+        title.className = 'soon-title';
+        title.textContent = 'Bald erreichbar';
+        section.appendChild(title);
+
+        const listDiv = document.createElement('div');
+        listDiv.className = 'doctors-list soon-list';
+
+        let expanded = false;
+        const INITIAL_LIMIT = 2;
+        const hasMore = doctors.length > INITIAL_LIMIT;
+
+        const updateList = () => {
+            listDiv.innerHTML = '';
+            const limit = expanded ? doctors.length : INITIAL_LIMIT;
+            doctors.slice(0, limit).forEach(d => {
+                listDiv.appendChild(createDoctorCard(d, 'soon'));
+            });
+        };
+
+        updateList();
+        section.appendChild(listDiv);
+
+        if (hasMore) {
+            const btnMore = document.createElement('button');
+            btnMore.className = 'btn-show-more';
+
+            const updateBtnText = () => {
+                btnMore.textContent = expanded
+                    ? 'Weniger anzeigen'
+                    : `${doctors.length - INITIAL_LIMIT} weitere anzeigen...`;
+            };
+            updateBtnText();
+
+            btnMore.onclick = () => {
+                expanded = !expanded;
+                updateList();
+                updateBtnText();
+            };
+            section.appendChild(btnMore);
+        }
+
+        container.appendChild(section);
+    }
+
+    // --- 3. MAIN RENDER CONTROLLER ---
+
+    function renderLists(openNow, openSoon) {
+        const anchor = document.querySelector('#searchResultList');
+        if (!anchor) return;
+
+        const old = document.getElementById('gm-doctor-lists');
+        if (old) old.remove();
+
+        const container = document.createElement('div');
+        container.id = 'gm-doctor-lists';
+
+        renderNowSection(container, openNow);
+        renderSoonSection(container, openSoon);
+
+        anchor.parentNode.insertBefore(container, anchor);
+    }
+
+
+    // --- 4. TEST DATA & INIT ---
+
+    function getTestDoctors() {
+        const now = Date.now();
+        return [
+            { name: 'Dr. Anna Müller', phone: '0301234567', category: 'Hausärztin', distance: 1.2, _remaining: 35, _nextStart: now, _isNow: true },
+            { name: 'Dr. Eva Schneider', phone: '0305551122', category: 'Psychotherapie', distance: 4.1, _remaining: 25, _nextStart: now + 25 * 60000, _isNow: false },
+            { name: 'Dr. Thomas Krüger', phone: '0304447788', category: 'Hausarzt', distance: 3.6, _remaining: 17 * 60, _nextStart: now + 17 * 60 * 60000, _isNow: false },
+            { name: 'Dipl.-Psych. Markus Weber', phone: '0309876543', category: 'Psychotherapie', distance: 2.8, _remaining: 90, _nextStart: now, _isNow: true }
+        ];
+    }
+
+    function buildListsFromTestData() {
+        const all = getTestDoctors();
+        const now = Date.now();
+        return {
+            openNow: all.filter(d => d._isNow).sort((a,b) => a.distance - b.distance),
+            // FIX: Nur anzeigen, wenn _nextStart noch HEUTE ist
+            openSoon: all.filter(d => !d._isNow && isSameDay(d._nextStart, now)).sort((a,b) => a._remaining - b._remaining)
+        };
+    }
+
+    // --- 5. MAIN LOOP ---
+
+    let lastListRef = null;
+
+    setInterval(() => {
+        // --- TEST MODE LOGIK ---
+        if (USE_TEST_DATA) {
+            let anchor = document.querySelector('#searchResultList');
+
+            // 1. Container erstellen falls nicht da
+            if (!anchor) {
+                const mainContent = document.querySelector('#app > div > .main-content');
+                if (mainContent) {
+                    const container = document.createElement('div');
+                    container.id = 'searchResultList';
+                    container.style.marginTop = '20px';
+                    mainContent.appendChild(container);
+                    anchor = container;
+                }
+            }
+
+            // 2. BREMSE: Nur rendern, wenn der Container leer ist.
+            // Behebt das Problem mit zuckenden Details/DevTools im Testmodus.
+            if (anchor && !document.getElementById('gm-doctor-lists')) {
+                const { openNow, openSoon } = buildListsFromTestData();
+                renderLists(openNow, openSoon);
+                console.log('[GM] Testdaten gerendert (Filter: Nur Heute).');
+            }
+            return;
+        }
+
+        // --- LIVE MODE LOGIK ---
+        const rootEl = unsafeWindow.document.querySelector('#app > div');
+        if (!rootEl || !rootEl.__vue__) return;
+
+        const comp = rootEl.__vue__;
+        let rawList = comp.alleGefundenenPraxen || comp.praxen || (comp.searchResult ? comp.searchResult.arztPraxisDatas : null);
+
+        if (!rawList && comp.$data && comp.$data.arztPraxisDatas) rawList = comp.$data.arztPraxisDatas;
+        if (!rawList || !Array.isArray(rawList)) return;
+
+        // Change Detection
+        if (rawList === lastListRef) {
+             // Optional: Prüfen ob unser Container durch Navigation gelöscht wurde
+             if (document.querySelector('#searchResultList') && !document.getElementById('gm-doctor-lists')) {
+                 // Force Re-Render
+             } else {
+                 return;
+             }
+        }
+        lastListRef = rawList;
+
+        const openNow = [];
+        const openSoon = [];
+        const now = new Date();
+
+        for (const doc of rawList) {
+            const mapped = mapRealDoctor(doc);
+
+            if (mapped._isNow) {
+                openNow.push(mapped);
+            }
+            // FIX: Nur zur Liste hinzufügen, wenn der nächste Termin noch HEUTE ist
+            else if (mapped._nextStart && isSameDay(mapped._nextStart, now)) {
+                openSoon.push(mapped);
+            }
+        }
+
+        openNow.sort((a,b) => parseFloat(a.distance) - parseFloat(b.distance));
+        openSoon.sort((a,b) => a._remaining - b._remaining);
+
+        renderLists(openNow, openSoon);
+
+    }, 1000);
+
+    // --- CSS ---
+    GM_addStyle(`
+        /* RESET & BASE */
+        .calendar-container { max-width: 800px; margin: 0 auto; padding: 20px; font-family: 'Inter', sans-serif; }
+        h3 { margin: 0; }
+
+        /* --- GLOBAL SECTION TITLE (Default für andere Bereiche) --- */
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 2rem;
+            text-align: center;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: block;
+        }
+
+        /* --- NOW SECTION OVERRIDES (GRÜN & KORRIGIERTE GRÖSSE) --- */
+        .now-section {
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            border: 1px solid #10b981;
+            border-radius: 16px;
+            padding: 2px;
+            box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.2);
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .now-section .section-title {
+            font-size: 1.4rem !important; /* Zwingt die Größe auf 1.4rem */
+            color: #065f46 !important;    /* Zwingt die Farbe auf Dunkelgrün */
+            background: none !important;  /* Entfernt den Gradienten */
+            -webkit-text-fill-color: initial !important; /* Entfernt Transparenz */
+            -webkit-background-clip: border-box !important; /* Entfernt Text-Clipping */
+            margin: 16px 0 8px;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+
+        .now-section .section-title::before {
+            content: ''; display: block; width: 12px; height: 12px;
+            background-color: #10b981; border-radius: 50%; animation: pulse-dot 1.5s infinite;
+        }
+
+        .now-list { background: rgba(255, 255, 255, 0.6); border-radius: 14px; padding: 8px; }
+
+        @keyframes pulse-dot {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* --- SOON SECTION (BLAU) --- */
+        .soon-section {
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border: 1px solid #3b82f6;
+            border-radius: 16px;
+            padding: 2px;
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.2);
+            overflow: hidden;
+        }
+        .soon-title {
+            margin: 16px 0 8px;
+            font-size: 1.4rem !important; /* Konsistent mit Now Section */
+            color: #1e40af;
+            display: flex; justify-content: center; align-items: center; gap: 10px; font-weight: bold;
+        }
+        .soon-title::before { content: '🕒'; font-size: 1rem; }
+        .soon-list {
+            padding: 8px; background: rgba(255, 255, 255, 0.6);
+            border-radius: 14px; display: flex; flex-direction: column; gap: 10px;
+        }
+
+        /* --- DOCTOR CARD STYLES --- */
+        #gm-doctor-lists { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .doctors-list { display: flex; flex-direction: column; gap: 10px; }
+
+        .doctor-card {
+            background: white;
+            border-bottom: 1px solid #f3f4f6;
+            border-radius: 8px;
+            padding: 12px 16px 4px;
+            display: flex; flex-direction: column; gap: 8px;
+            position: relative; transition: background 0.1s;
+        }
+
+        .card-header-row { display: flex; justify-content: space-between; align-items: flex-start; }
+        .header-actions { display: flex; gap: 8px; }
+
+        .time-slot { font-size: 0.9rem; font-weight: 700; padding: 4px 8px; border-radius: 6px; white-space: nowrap; }
+        .time-slot.active { background: #10b981; color: white; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2); }
+        .time-slot.pending { background: #3b82f6; color: white; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2); }
+
+        /* Buttons */
+        .btn-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; border: none; cursor: pointer; transition: all 0.2s; text-decoration: none; position: relative; }
+        .btn-icon.call { background: #10b981; color: white; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2); }
+        .btn-icon.call:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-icon.reminder { background: #3b82f6; color: white; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2); }
+        .btn-icon.reminder:hover { transform: translateY(-1px); }
+        .btn-icon.history { background: #f3f4f6; color: #4b5563; }
+        .btn-icon.history:hover { background: #e5e7eb; }
+        .primary-pulse { animation: pulse-shadow 2s infinite; }
+        @keyframes pulse-shadow { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+
+        /* INFO & NAME */
+        .doctor-main-info { display: flex; flex-direction: column; gap: 4px; margin-top: -4px; }
+        .name-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+
+        .doctor-name {
+            font-size: 1.05rem !important; /* FIX: Zwingt Größe auf 1.05rem */
+            font-weight: 600;
+            color: #111827;
+            margin: 0; line-height: 1.3;
+        }
+
+        .doctor-dist { font-size: 0.8rem; background: #f3f4f6; color: #6b7280; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+        .doctor-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem; color: #6b7280; align-items: center; }
+
+        /* EXPANDER & LOGS */
+        .expander-bar { height: 12px; width: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-top: 4px; }
+        .expander-bar:hover .expander-handle { background: #9ca3af; }
+        .expander-handle { width: 40px; height: 4px; background: #e5e7eb; border-radius: 2px; transition: background 0.2s; }
+        .doctor-logs { background: #f9fafb; border-top: 1px solid #f3f4f6; padding: 12px 16px; display: none; }
+        .doctor-logs.open { display: block; }
+        .expanded-actions { display: flex; flex-direction: column; gap: 8px; }
+        .opening-hours-row { background: #eff6ff; border: 1px solid #dbeafe; border-radius: 6px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; color: #1e40af; }
+        .oh-label { font-weight: 500; } .oh-value { font-weight: 700; }
+        .btn-manual-log { width: 100%; padding: 8px; background: white; border: 1px solid #d1d5db; border-radius: 6px; color: #374151; font-weight: 500; font-size: 0.9rem; cursor: pointer; }
+        .btn-manual-log:hover { background: #f3f4f6; border-color: #9ca3af; }
+
+        .btn-show-more, .btn-show-called { width: 100%; padding: 12px; background: transparent; border: none; color: #3b82f6; font-weight: 600; cursor: pointer; border-top: 1px solid rgba(59, 130, 246, 0.1); transition: background 0.2s; }
+        .btn-show-more:hover { background: rgba(59, 130, 246, 0.05); }
+        .called-toggle-container { margin: 10px 0; text-align: center; }
+        .btn-show-called { background: #f3f4f6; border: 1px solid #d1d5db; color: #6b7280; padding: 8px 16px; border-radius: 20px; font-size: 0.9rem; width: auto; }
+    `);
+
+})();
