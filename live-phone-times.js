@@ -198,6 +198,33 @@
         return { isOpen: false, remaining: 0 };
     }
 
+    function getTodayTimes(tszArray) {
+        if (!tszArray || !Array.isArray(tszArray)) return 'Keine Daten';
+        const now = FakeTime.now();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d_day = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d_day}`;
+
+        const todayEntry = tszArray.find(d => d.d.startsWith(todayStr));
+        if (!todayEntry || !todayEntry.typTsz) return 'Keine Sprechzeiten heute';
+
+        const times = [];
+        for (const typObj of todayEntry.typTsz) {
+            // 07 = Tel. Erreichbarkeit? Or general?
+            // The user wants "Heutige Sprechzeiten".
+            // Usually typ '01' is Sprechstunde, '07' is Telefon.
+            // Let's grab all available times or specific ones?
+            // The checkIsPhoneOpenNow uses '07'. Let's show those as they are "Phone Times".
+            if (typObj.typ === '07' && typObj.sprechzeiten) {
+                for (const zeit of typObj.sprechzeiten) {
+                    times.push(zeit.z);
+                }
+            }
+        }
+        return times.length > 0 ? times.join(', ') : 'Heute geschlossen';
+    }
+
     function mapRealDoctor(doc) {
         const now = FakeTime.now();
         const nowMs = now.getTime();
@@ -230,6 +257,9 @@
         return {
             name: fullName,
             phone: doc.tel || 'Keine Nummer',
+            email: doc.email,
+            website: doc.homepage || doc.url || doc.www,
+            times: getTodayTimes(doc.tsz),
             category: category,
             distance: distKm,
             address: `${doc.strasse || ''} ${doc.hausnummer || ''}, ${doc.plz || ''} ${doc.ort || ''}`,
@@ -270,7 +300,6 @@
                     <div class="header-actions">
                         ${isNow ? `
                         <a href="tel:${d.phone.replace(/\s/g,'')}" class="btn-icon call primary-pulse" title="Anrufen">📞</a>
-                        <button class="btn-icon history" title="Notiz">📝</button>
                         ` : `
                         <button class="btn-icon reminder" title="Erinnerung erstellen">📅</button>
                         `}
@@ -295,11 +324,29 @@
 
             <div class="doctor-logs ${isExpanded ? 'open' : ''}">
                 <div class="expanded-actions">
+                     ${d.times ? `
                      <div class="opening-hours-row">
-                        <span class="oh-label">Status:</span>
-                        <span class="oh-value">${d.raw && d.raw.tsz ? 'Daten vorhanden' : 'Keine Daten'}</span>
+                        <span class="oh-label">Heutige Sprechzeiten:</span>
+                        <span class="oh-value">${d.times}</span>
+                     </div>` : ''}
+
+                     <div class="doctor-contact-info">
+                        ${d.address ? `
+                        <div class="contact-row">
+                            <span class="contact-value">📍 ${d.address}</span>
+                            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.address)}" target="_blank" class="btn-maps" title="Auf Karte zeigen">Karte</a>
+                        </div>` : ''}
+
+                        <div class="contact-row">
+                            <span class="contact-value ${!d.email ? 'missing' : ''}">✉️ ${d.email || 'Keine Email hinterlegt'}</span>
+                            <button class="btn-send-email ${!d.email ? 'disabled' : ''}" ${!d.email ? 'disabled' : ''} data-email="${d.email || ''}">Senden</button>
+                        </div>
+
+                        ${d.website ? `
+                        <div class="contact-row">
+                            <span class="contact-value">🌐 <a href="${d.website}" target="_blank" class="contact-link">${d.website}</a></span>
+                        </div>` : ''}
                      </div>
-                     <button class="btn-manual-log">+ Manuell erfassen</button>
                 </div>
             </div>
         `;
@@ -310,6 +357,26 @@
             if (nowOpen) expandedDoctors.add(docId);
             else expandedDoctors.delete(docId);
         };
+
+        const emailBtn = wrapper.querySelector('.btn-send-email');
+        if (emailBtn && d.email) {
+            emailBtn.onclick = () => {
+                 const subject = encodeURIComponent("Terminanfrage");
+
+                 let salutation = "Sehr geehrte/r";
+                 // Check Anrede from raw data
+                 const anrede = d.raw && d.raw.anrede ? d.raw.anrede : '';
+
+                 if (anrede === 'Herr') {
+                     salutation = "Sehr geehrter Herr";
+                 } else if (anrede === 'Frau') {
+                     salutation = "Sehr geehrte Frau";
+                 }
+
+                 const body = encodeURIComponent(`${salutation} ${d.name},\n\n\nMit freundlichen Grüßen\n\n`);
+                 window.open(`mailto:${d.email}?subject=${subject}&body=${body}`, '_blank');
+            };
+        }
 
         if(!isNow) {
              const reminderBtn = wrapper.querySelector('.btn-icon.reminder');
@@ -657,8 +724,22 @@
         .expanded-actions { display: flex; flex-direction: column; gap: 8px; }
         .opening-hours-row { background: #eff6ff; border: 1px solid #dbeafe; border-radius: 6px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; color: #1e40af; }
         .oh-label { font-weight: 500; } .oh-value { font-weight: 700; }
-        .btn-manual-log { width: 100%; padding: 8px; background: white; border: 1px solid #d1d5db; border-radius: 6px; color: #374151; font-weight: 500; font-size: 0.9rem; cursor: pointer; }
-        .btn-manual-log:hover { background: #f3f4f6; border-color: #9ca3af; }
+
+        .doctor-contact-info { margin-top: 4px; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 4px;}
+        .contact-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .contact-value { color: #374151; word-break: break-all; }
+        .contact-value.missing { color: #9ca3af; font-style: italic; }
+        .contact-link { color: #3b82f6; text-decoration: none; }
+        .contact-link:hover { text-decoration: underline; }
+
+        .btn-maps, .btn-send-email {
+            padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 4px;
+            font-size: 0.8rem; cursor: pointer; text-decoration: none; color: #374151; background: white;
+            white-space: nowrap; transition: background 0.1s;
+        }
+        .btn-maps:hover, .btn-send-email:not(.disabled):hover { background: #f3f4f6; border-color: #9ca3af; }
+
+        .btn-send-email.disabled { opacity: 0.5; cursor: not-allowed; background: #f9fafb; }
 
         .btn-show-more, .btn-show-called { width: 100%; padding: 12px; background: transparent; border: none; color: #3b82f6; font-weight: 600; cursor: pointer; border-top: 1px solid rgba(59, 130, 246, 0.1); transition: background 0.2s; }
         .btn-show-more:hover { background: rgba(59, 130, 246, 0.05); }
