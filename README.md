@@ -1,3 +1,18 @@
+## `live-phone-times.js`
+
+This userscript enhances the 116117 search results by visualizing live telephone availability and improving the overall user experience.
+
+![Live Phone Times Preview](img/live-phone-times.png)
+
+### Key Features
+
+- **Live Availability Status**: Instantly see if a doctor is currently reachable (`Jetzt erreichbar`) or when they will be next (`Bald erreichbar`).
+- **Visual Indicators**: Color-coded sections (Green for available now, Blue for available soon).
+- **Enhanced Doctor Cards**:
+  - **Quick Actions**: Call, Email (with templates), and Open in Maps buttons.
+  - **Smart Details**: Collapsible view with today's opening hours and additional contact info.
+- **Test Mode**: Simulate different dates and times to verify availability logic (only available when `dev-cache.js` is active).
+
 ## `dev-cache.js`
 
 This is a **Violentmonkey/Tampermonkey/Greasemonkey userscript** designed to cache network requests (`fetch` and `XHR`) for `arztsuche.116117.de`.
@@ -30,6 +45,8 @@ The primary goal is to **prevent hitting rate limits** while developing or testi
 
 This is a userscript designed to **export search results** from `arztsuche.116117.de` as a JSON file.
 
+![JSON Export Preview](img/export-json.png)
+
 ### Purpose
 
 This tool allows users to capture the raw data returned by the API during a search (the doctor application) and save it locally for analysis or processing.
@@ -54,6 +71,8 @@ This tool allows users to capture the raw data returned by the API during a sear
 ## `export-csv.js`
 
 This is a userscript designed to **export search results** as a **CSV file** (compatible with Excel).
+
+![CSV Export Preview](img/export-csv.png)
 
 ### Purpose
 
