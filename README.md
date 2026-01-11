@@ -45,7 +45,7 @@ This tool allows developers or power users to capture the raw data returned by t
 ### Installation Instructions
 
 1. Install a userscript manager like **Violentmonkey** (Firefox) or **Tampermonkey** (Chrome/Edge).
-2. **Easy Install**: Visit [GreasyFork](https://greasyfork.org/de/scripts/523458-116117-arztsuche-data-export-json) and click **"Install this script"**.
+2. **Easy Install**: Visit [GreasyFork](https://greasyfork.org/en/scripts/562284-116117-arztsuche-data-export-json) and click **"Install this script"**.
 3. **Manual Install**:
    - Create a new script.
    - Copy the contents of `dev-export-json.js` into the script editor.
